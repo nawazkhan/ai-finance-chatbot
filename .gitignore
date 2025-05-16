@@ -29,6 +29,8 @@ yarn-error.log*
 # local env files
 .env*
 __pycache__/
+chatbot-env/
+chatbot-whats-env/
 
 # vercel
 .vercel
