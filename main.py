@@ -24,7 +24,9 @@ async def index():
 
 @app.post("/message")
 async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_db)):
+    print("Webhook /message called")
     form_data = await request.form()
+    print(f"Form data received: {form_data}")
     whatsapp_number = form_data['From'].split('whatsapp:')[-1]
     print(f"Sending the ChatGPT response to this number: {whatsapp_number}")
 
