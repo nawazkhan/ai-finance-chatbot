@@ -42,6 +42,8 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
         temperature=0.5,
     )
 
+    logger.info(f"ChatGPT response: {response}")
+
     # Extract the text content from the response structure
     chatgpt_response = ""
     if response.content and len(response.content) > 0:
@@ -53,8 +55,6 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
     if not chatgpt_response:
         chatgpt_response = "I apologize, but I couldn't generate a proper response. Please try again."
         logger.error(f"Failed to extract text content from OpenAI response: {response}")
-    
-    logger.info(f"ChatGPT response: {chatgpt_response}")
     
     try:
         conversation = Conversation(
