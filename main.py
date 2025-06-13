@@ -24,25 +24,39 @@ async def index():
 
 @app.post("/message")
 async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_db)):
-    print("Webhook /message called")
+    logger.info("Webhook /message called")
     form_data = await request.form()
-    print(f"Form data received: {form_data}")
+    logger.info(f"Form data received: {form_data}")
     whatsapp_number = form_data['From'].split('whatsapp:')[-1]
-    print(f"Sending the ChatGPT response to this number: {whatsapp_number}")
+    logger.info(f"Sending the ChatGPT response to this number: {whatsapp_number}")
 
-    messages = [{"role": "user", "content": Body}]
-    messages.append({"role": "system", "content": "You're a helpful investor, a serial founder and you've sold many startups. You understand nothing but business. You are here to give advice on business."})
-    response = client.chat.completions.create(
-      model=config('OPENAI_MODEL'),
-      messages=messages,
-      max_tokens=1000,
-      temperature=0.5,
-      n=1,
-      stop=None,
+    input_messages = [
+        {"role": "user", "content": Body},
+        {"role": "system", "content": "You're a helpful investor, a serial founder and you've sold many startups. You understand nothing but business. You are here to give advice on business."}
+    ]
+    
+    response = client.responses.create(
+        model=config('OPENAI_MODEL'),
+        input=input_messages,
+        max_tokens=1000,
+        temperature=0.5,
+        n=1,
+        stop=None,
     )
 
-    chatgpt_response = response.choices[0].message.content
-    print(f"ChatGPT response: {chatgpt_response}")
+    # Extract the text content from the response structure
+    chatgpt_response = ""
+    if response.content and len(response.content) > 0:
+        for content_item in response.content:
+            if content_item.type == "output_text":
+                chatgpt_response = content_item.text
+                break
+    
+    if not chatgpt_response:
+        chatgpt_response = "I apologize, but I couldn't generate a proper response. Please try again."
+        logger.error(f"Failed to extract text content from OpenAI response: {response}")
+    
+    logger.info(f"ChatGPT response: {chatgpt_response}")
     
     try:
         conversation = Conversation(
@@ -53,8 +67,8 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
         db.add(conversation)
         db.commit()
     except SQLAlchemyError as e:
-      db.rollback()
-      logger.error(f"Failed to save conversation to database: {str(e)}")
+        db.rollback()
+        logger.error(f"Failed to save conversation to database: {str(e)}")
     
     send_whatsapp_message(whatsapp_number, chatgpt_response)
     return {"message": chatgpt_response}
