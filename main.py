@@ -35,7 +35,7 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
     response = client.chat.completions.create(
       model=config('OPENAI_MODEL'),
       messages=messages,
-      max_tokens=100,
+      max_tokens=1000,
       temperature=0.5,
       n=1,
       stop=None,
