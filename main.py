@@ -38,10 +38,8 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
     response = client.responses.create(
         model=config('OPENAI_MODEL'),
         input=input_messages,
-        max_tokens=1000,
+        max_output_tokens=1000,
         temperature=0.5,
-        n=1,
-        stop=None,
     )
 
     # Extract the text content from the response structure
