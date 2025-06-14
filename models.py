@@ -23,5 +23,6 @@ class Conversation(Base):
     sender = Column(String)
     message = Column(String)
     response = Column(String)
+    response_id = Column(String, nullable=True)  # Store the OpenAI response ID
 
 Base.metadata.create_all(engine)

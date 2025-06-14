@@ -3,6 +3,7 @@ from fastapi import FastAPI, Form, Request, Depends
 from decouple import config
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 
 from models import Conversation, SessionLocal
 from utils import send_whatsapp_message, logger
@@ -30,25 +31,35 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
     whatsapp_number = form_data['From'].split('whatsapp:')[-1]
     logger.info(f"Sending the ChatGPT response to this number: {whatsapp_number}")
 
-    input_messages = [
-        {"role": "user", "content": Body},
-        {"role": "system", "content": "You're a helpful investor, a serial founder and you've sold many startups. You understand nothing but business. You are here to give advice on business."}
-    ]
+    # Get the last conversation for this number
+    last_conversation = db.query(Conversation)\
+        .filter(Conversation.sender == whatsapp_number)\
+        .order_by(desc(Conversation.id))\
+        .first()
+
+    # Prepare the API call parameters
+    api_params = {
+        "model": config('OPENAI_MODEL'),
+        "input": Body,
+        "max_output_tokens": 1000,
+        "temperature": 0.5,
+    }
+
+    # If there's a previous conversation, add the previous_response_id
+    if last_conversation and last_conversation.response_id:
+        api_params["previous_response_id"] = last_conversation.response_id
     
-    response = client.responses.create(
-        model=config('OPENAI_MODEL'),
-        input=input_messages,
-        max_output_tokens=1000,
-        temperature=0.5,
-    )
+    response = client.responses.create(**api_params)
     
+    logger.info(f"Response: {response}")
     chatgpt_response = response.output_text
     
     try:
         conversation = Conversation(
             sender=whatsapp_number,
             message=Body,
-            response=chatgpt_response
+            response=chatgpt_response,
+            response_id=response.id
         )
         db.add(conversation)
         db.commit()

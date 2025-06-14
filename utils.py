@@ -68,6 +68,7 @@ def send_whatsapp_message(to_number, message):
             # Add part number if message is split into multiple parts
             if len(chunks) > 1:
                 chunk = f"📱 Part {i}/{len(chunks)}\n\n{chunk}"
+                logger.info(f"Part {i}/{len(chunks)}\n\n{chunk}")
             
             message = client.messages.create(
                 body=chunk,
