@@ -23,6 +23,13 @@ def get_db():
 async def index():
     return {"msg": "working"}
 
+def is_stock_request(message):
+    """Check if the message is asking for stock or financial information"""
+    stock_keywords = ['stock', 'share', 'financial', 'earnings', 'revenue', 'profit', 'market cap', 
+                      'dividend', 'pe ratio', 'eps', 'ticker', 'nasdaq', 'nyse', 'dow', 'sp500']
+    message_lower = message.lower()
+    return any(keyword in message_lower for keyword in stock_keywords)
+
 @app.post("/message")
 async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_db)):
     logger.info("Webhook /message called")
@@ -44,6 +51,17 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
         "max_output_tokens": 1000,
         "temperature": 0.5,
     }
+
+    # Add web search tool for stock/financial requests
+    if is_stock_request(Body):
+        api_params["tools"] = [
+            {
+                "type": "web_search",
+                "web_search": {
+                    "max_results": 5
+                }
+            }
+        ]
 
     # If there's a previous conversation, add the previous_response_id
     if last_conversation and last_conversation.response_id:
