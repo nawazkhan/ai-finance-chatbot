@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy.engine import URL
 
 from alembic import context
 from decouple import config as decouple_config
@@ -11,8 +12,22 @@ from models import Base
 # access to the values within the .ini file in use.
 config = context.config
 
-# Set the sqlalchemy.url from the environment variable
-config.set_main_option('sqlalchemy.url', decouple_config('DATABASE_URL'))
+# Set the sqlalchemy.url from the environment variables
+try:
+    database_url = decouple_config('DATABASE_URL')
+except:
+    # Fallback to constructing URL from individual components
+    url = URL.create(
+        drivername=decouple_config('DB_DRIVER'),
+        username=decouple_config('DB_USER'),
+        password=decouple_config('DB_PASSWORD'),
+        host=decouple_config('DB_HOST'),
+        port=decouple_config('DB_PORT'),
+        database=decouple_config('DB_NAME')
+    )
+    database_url = str(url)
+
+config.set_main_option('sqlalchemy.url', database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
