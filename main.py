@@ -57,7 +57,6 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
         api_params["tools"] = [
             {
                 "type": "web_search_preview",
-                "tool_choice": "web_search_preview",
                 "search_context_size": "low",
                 "web_search_preview": {
                     "max_results": 5,
@@ -65,6 +64,7 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
                 }
             }
         ]
+        api_params["tool_choice"] = "web_search_preview"
 
     # If there's a previous conversation, add the previous_response_id
     if last_conversation and last_conversation.response_id:
