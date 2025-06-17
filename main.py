@@ -56,9 +56,12 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
     if is_stock_request(Body):
         api_params["tools"] = [
             {
-                "type": "web_search",
-                "web_search": {
-                    "max_results": 5
+                "type": "web_search_preview",
+                "tool_choice": "web_search_preview",
+                "search_context_size": "low",
+                "web_search_preview": {
+                    "max_results": 5,
+                    "search_depth": "basic"
                 }
             }
         ]
