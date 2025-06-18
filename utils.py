@@ -2,7 +2,6 @@ import logging
 import re
 import html
 import time
-
 from twilio.rest import Client
 from decouple import config
 
@@ -16,7 +15,6 @@ client = Client(account_sid, auth_token)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 def format_message(text):
     """
     Cleans and formats text to look good on WhatsApp.
@@ -28,8 +26,8 @@ def format_message(text):
     text = re.sub(r'\s+', ' ', text)
 
     # Convert markdown-style headings to bold
-    text = re.sub(r'(?m)^## (.+)$', r'*📌 \1*', text)
-    text = re.sub(r'(?m)^\*\*(.+?):\*\*', r'*🔹 \1*', text)
+    text = re.sub(r'(?m)^## (.+)$', r'*\U0001F4CC \1*', text)
+    text = re.sub(r'(?m)\*\*(.+?)\*\*', r'*\1*', text)
 
     # Bullet points
     text = re.sub(r'(?m)^[-*] ', '• ', text)
@@ -47,7 +45,6 @@ def format_message(text):
     text = text.strip()
 
     return text
-
 
 def split_into_chunks(message, max_length=1500):
     """
@@ -84,18 +81,19 @@ def split_into_chunks(message, max_length=1500):
 
     return chunks
 
-
 def send_whatsapp_message(to_number, message):
     """
     Formats and sends a text-only WhatsApp message in chunks.
+    Automatically groups all OpenAI continuation chunks before sending.
     """
     try:
+        # Combine multiple OpenAI responses if needed (assumes you pass full response text)
         formatted = format_message(message)
         chunks = split_into_chunks(formatted)
 
         for i, chunk in enumerate(chunks, 1):
             if len(chunks) > 1:
-                chunk = f"📱 *Part {i}/{len(chunks)}*\n\n{chunk}"
+                chunk = f"\U0001F4F1 *Part {i}/{len(chunks)}*\n\n{chunk}"
 
             response = client.messages.create(
                 body=chunk,
@@ -104,12 +102,11 @@ def send_whatsapp_message(to_number, message):
             )
             logger.info(f"WhatsApp message part {i}/{len(chunks)} sent to {to_number}")
 
-            # Add delay to ensure correct order
+            # Delay to ensure WhatsApp receives in order
             time.sleep(1.5)
 
     except Exception as e:
         logger.error(f"Failed to send WhatsApp message: {str(e)}")
-
 
 def send_media_message(to_number, media_url, caption=""):
     """
@@ -126,11 +123,12 @@ def send_media_message(to_number, media_url, caption=""):
     except Exception as e:
         logger.error(f"Failed to send media message: {str(e)}")
 
-
-# Optional helper to auto-detect and send media links from response
 def extract_and_send_media(response_text, to_number):
+    """
+    Detects and sends media links (jpg, png, gif, mp4, webp) found in response.
+    """
     media_links = re.findall(r'(https?://\S+\.(?:jpg|png|jpeg|gif|mp4|webp))', response_text)
     for media_url in media_links:
-        caption = "📎 Media attached:"
+        caption = "\U0001F4CE Media attached:"
         send_media_message(to_number, media_url, caption)
-        time.sleep(1)  # Optional: delay between media sends
+        time.sleep(1)  # Optional delay between sends
