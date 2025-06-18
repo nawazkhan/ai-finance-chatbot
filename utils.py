@@ -1,6 +1,7 @@
 import logging
 import re
 import html
+import time
 
 from twilio.rest import Client
 from decouple import config
@@ -103,6 +104,9 @@ def send_whatsapp_message(to_number, message):
             )
             logger.info(f"WhatsApp message part {i}/{len(chunks)} sent to {to_number}")
 
+            # Add delay to ensure correct order
+            time.sleep(1.5)
+
     except Exception as e:
         logger.error(f"Failed to send WhatsApp message: {str(e)}")
 
@@ -129,3 +133,4 @@ def extract_and_send_media(response_text, to_number):
     for media_url in media_links:
         caption = "📎 Media attached:"
         send_media_message(to_number, media_url, caption)
+        time.sleep(1)  # Optional: delay between media sends
