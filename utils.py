@@ -1,83 +1,131 @@
 import logging
-import textwrap
 import re
+import html
 
 from twilio.rest import Client
 from decouple import config
 
+# Twilio credentials from .env
 account_sid = config('TWILIO_ACCOUNT_SID')
 auth_token = config('TWILIO_AUTH_TOKEN')
-client = Client(account_sid, auth_token)
 twilio_number = config('TWILIO_NUMBER')
+
+client = Client(account_sid, auth_token)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def format_message(text):
-    # Remove multiple spaces
+    """
+    Cleans and formats text to look good on WhatsApp.
+    """
+    # Decode HTML entities
+    text = html.unescape(text)
+
+    # Fix spacing issues
     text = re.sub(r'\s+', ' ', text)
-    
-    # Add line breaks after periods followed by space
+
+    # Convert markdown-style headings to bold
+    text = re.sub(r'(?m)^## (.+)$', r'*📌 \1*', text)
+    text = re.sub(r'(?m)^\*\*(.+?):\*\*', r'*🔹 \1*', text)
+
+    # Bullet points
+    text = re.sub(r'(?m)^[-*] ', '• ', text)
+
+    # Numbered lists: add line break before if needed
+    text = re.sub(r'(?m)^(\d+\.)', r'\n\1', text)
+
+    # Line breaks after punctuation
     text = re.sub(r'\. ', '.\n\n', text)
-    
-    # Add line breaks after question marks
     text = re.sub(r'\? ', '?\n\n', text)
-    
-    # Add line breaks after exclamation marks
     text = re.sub(r'! ', '!\n\n', text)
-    
-    # Add line breaks after colons
-    text = re.sub(r': ', ':\n', text)
-    
-    # Add line breaks after bullet points
-    text = re.sub(r'\* ', '\n• ', text)
-    
-    # Add line breaks after numbered points
-    text = re.sub(r'(\d+\.)', r'\n\1', text)
-    
-    # Remove any triple or more newlines
+
+    # Cleanup multiple line breaks
     text = re.sub(r'\n{3,}', '\n\n', text)
-    
-    # Remove any leading/trailing whitespace
     text = text.strip()
-    
+
     return text
 
-def send_whatsapp_message(to_number, message):
-    try:
-        # Format the message first
-        formatted_message = format_message(message)
-        
-        # Split message into chunks of 1500 characters, preserving line breaks
-        chunks = []
-        current_chunk = ""
-        
-        for line in formatted_message.split('\n'):
-            if len(current_chunk) + len(line) + 1 <= 1500:
-                current_chunk += line + '\n'
+
+def split_into_chunks(message, max_length=1500):
+    """
+    Splits a message into WhatsApp-friendly chunks.
+    """
+    paragraphs = message.split('\n\n')
+    chunks = []
+    current_chunk = ""
+
+    for para in paragraphs:
+        para += '\n\n'
+        if len(current_chunk) + len(para) <= max_length:
+            current_chunk += para
+        else:
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            # Further split long paragraph by sentence
+            if len(para) > max_length:
+                sentences = re.split(r'(?<=[.!?]) +', para)
+                temp = ""
+                for sentence in sentences:
+                    if len(temp) + len(sentence) + 1 <= max_length:
+                        temp += sentence + " "
+                    else:
+                        chunks.append(temp.strip())
+                        temp = sentence + " "
+                if temp:
+                    chunks.append(temp.strip())
             else:
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                current_chunk = line + '\n'
-        
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-        
-        # Send each chunk
+                current_chunk = para
+
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+
+    return chunks
+
+
+def send_whatsapp_message(to_number, message):
+    """
+    Formats and sends a text-only WhatsApp message in chunks.
+    """
+    try:
+        formatted = format_message(message)
+        chunks = split_into_chunks(formatted)
+
         for i, chunk in enumerate(chunks, 1):
-            # Add part number if message is split into multiple parts
             if len(chunks) > 1:
-                chunk = f"📱 Part {i}/{len(chunks)}\n\n{chunk}"
-                logger.info(f"Part {i}/{len(chunks)}\n\n{chunk}")
-            
-            message = client.messages.create(
+                chunk = f"📱 *Part {i}/{len(chunks)}*\n\n{chunk}"
+
+            response = client.messages.create(
                 body=chunk,
                 from_=f"whatsapp:{twilio_number}",
                 to=f"whatsapp:{to_number}"
             )
-            logger.info(f"WhatsApp message part {i}/{len(chunks)} sent successfully to {to_number}")
-            
+            logger.info(f"WhatsApp message part {i}/{len(chunks)} sent to {to_number}")
+
     except Exception as e:
         logger.error(f"Failed to send WhatsApp message: {str(e)}")
 
-logger = logging.getLogger(__name__)
+
+def send_media_message(to_number, media_url, caption=""):
+    """
+    Sends a media message (image, video) with optional caption.
+    """
+    try:
+        client.messages.create(
+            from_=f"whatsapp:{twilio_number}",
+            to=f"whatsapp:{to_number}",
+            body=caption,
+            media_url=[media_url]
+        )
+        logger.info(f"Media message sent to {to_number}")
+    except Exception as e:
+        logger.error(f"Failed to send media message: {str(e)}")
+
+
+# Optional helper to auto-detect and send media links from response
+def extract_and_send_media(response_text, to_number):
+    media_links = re.findall(r'(https?://\S+\.(?:jpg|png|jpeg|gif|mp4|webp))', response_text)
+    for media_url in media_links:
+        caption = "📎 Media attached:"
+        send_media_message(to_number, media_url, caption)
