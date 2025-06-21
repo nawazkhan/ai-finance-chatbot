@@ -19,37 +19,21 @@ def format_message(text):
     """
     Cleans and formats text to look good on WhatsApp.
     """
-    # Decode HTML entities
     text = html.unescape(text)
-
-    # Fix spacing issues
     text = re.sub(r'\s+', ' ', text)
 
-    # Convert markdown-style headings to bold
+    # Safe unicode emoji escape using raw strings or unicode literals
     text = re.sub(r'(?m)^## (.+)$', r'*\U0001F4CC \1*', text)
     text = re.sub(r'(?m)\*\*(.+?)\*\*', r'*\1*', text)
-
-    # Bullet points
     text = re.sub(r'(?m)^[-*] ', '• ', text)
-
-    # Numbered lists: add line break before if needed
     text = re.sub(r'(?m)^(\d+\.)', r'\n\1', text)
-
-    # Line breaks after punctuation
     text = re.sub(r'\. ', '.\n\n', text)
     text = re.sub(r'\? ', '?\n\n', text)
     text = re.sub(r'! ', '!\n\n', text)
-
-    # Cleanup multiple line breaks
     text = re.sub(r'\n{3,}', '\n\n', text)
-    text = text.strip()
-
-    return text
+    return text.strip()
 
 def split_into_chunks(message, max_length=1500):
-    """
-    Splits a message into WhatsApp-friendly chunks.
-    """
     paragraphs = message.split('\n\n')
     chunks = []
     current_chunk = ""
@@ -61,7 +45,6 @@ def split_into_chunks(message, max_length=1500):
         else:
             if current_chunk:
                 chunks.append(current_chunk.strip())
-            # Further split long paragraph by sentence
             if len(para) > max_length:
                 sentences = re.split(r'(?<=[.!?]) +', para)
                 temp = ""
@@ -82,18 +65,14 @@ def split_into_chunks(message, max_length=1500):
     return chunks
 
 def send_whatsapp_message(to_number, message):
-    """
-    Formats and sends a text-only WhatsApp message in chunks.
-    Automatically groups all OpenAI continuation chunks before sending.
-    """
     try:
-        # Combine multiple OpenAI responses if needed (assumes you pass full response text)
         formatted = format_message(message)
         chunks = split_into_chunks(formatted)
 
         for i, chunk in enumerate(chunks, 1):
             if len(chunks) > 1:
-                chunk = f"\U0001F4F1 *Part {i}/{len(chunks)}*\n\n{chunk}"
+                # Use a literal emoji instead of \U0001F4F1 to avoid escape issues
+                chunk = f"📱 *Part {i}/{len(chunks)}*\n\n{chunk}"
 
             response = client.messages.create(
                 body=chunk,
@@ -101,17 +80,12 @@ def send_whatsapp_message(to_number, message):
                 to=f"whatsapp:{to_number}"
             )
             logger.info(f"WhatsApp message part {i}/{len(chunks)} sent to {to_number}")
-
-            # Delay to ensure WhatsApp receives in order
             time.sleep(1.5)
 
     except Exception as e:
         logger.error(f"Failed to send WhatsApp message: {str(e)}")
 
 def send_media_message(to_number, media_url, caption=""):
-    """
-    Sends a media message (image, video) with optional caption.
-    """
     try:
         client.messages.create(
             from_=f"whatsapp:{twilio_number}",
@@ -124,11 +98,8 @@ def send_media_message(to_number, media_url, caption=""):
         logger.error(f"Failed to send media message: {str(e)}")
 
 def extract_and_send_media(response_text, to_number):
-    """
-    Detects and sends media links (jpg, png, gif, mp4, webp) found in response.
-    """
     media_links = re.findall(r'(https?://\S+\.(?:jpg|png|jpeg|gif|mp4|webp))', response_text)
     for media_url in media_links:
-        caption = "\U0001F4CE Media attached:"
+        caption = "Media attached:"
         send_media_message(to_number, media_url, caption)
-        time.sleep(1)  # Optional delay between sends
+        time.sleep(1)

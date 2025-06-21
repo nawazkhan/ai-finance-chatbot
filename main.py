@@ -24,27 +24,27 @@ async def index():
     return {"msg": "working"}
 
 def is_stock_request(message):
-    """Check if the message is asking for stock or financial information"""
-    stock_keywords = ['stock', 'share', 'financial', 'earnings', 'revenue', 'profit', 'market cap', 
-                      'dividend', 'pe ratio', 'eps', 'ticker', 'nasdaq', 'nyse', 'dow', 'sp500']
-    message_lower = message.lower()
-    return any(keyword in message_lower for keyword in stock_keywords)
+    stock_keywords = [
+        'stock', 'share', 'financial', 'earnings', 'revenue', 'profit', 
+        'market cap', 'dividend', 'pe ratio', 'eps', 'ticker', 
+        'nasdaq', 'nyse', 'dow', 'sp500'
+    ]
+    return any(keyword in message.lower() for keyword in stock_keywords)
 
 @app.post("/message")
 async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_db)):
     logger.info("Webhook /message called")
     form_data = await request.form()
     logger.info(f"Form data received: {form_data}")
+
     whatsapp_number = form_data['From'].split('whatsapp:')[-1]
     logger.info(f"Sending the ChatGPT response to this number: {whatsapp_number}")
 
-    # Get the last conversation for this number
     last_conversation = db.query(Conversation)\
         .filter(Conversation.sender == whatsapp_number)\
         .order_by(desc(Conversation.id))\
         .first()
 
-    # Prepare the API call parameters
     api_params = {
         "model": config('OPENAI_MODEL'),
         "input": Body,
@@ -52,19 +52,17 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
         "temperature": 0.5,
     }
 
-    # Add web search tool for stock/financial requests
     if is_stock_request(Body):
         api_params["tools"] = [{"type": "web_search_preview"}]
 
-    # If there's a previous conversation, add the previous_response_id
     if last_conversation and last_conversation.response_id:
         api_params["previous_response_id"] = last_conversation.response_id
-    
+
     response = client.responses.create(**api_params)
-    
+
     logger.info(f"Response: {response}")
     chatgpt_response = response.output_text
-    
+
     try:
         conversation = Conversation(
             sender=whatsapp_number,
@@ -77,12 +75,6 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Failed to save conversation to database: {str(e)}")
-    
+
     send_whatsapp_message(whatsapp_number, chatgpt_response)
     return {"message": chatgpt_response}
-    
-    
-    
-    
-
-
