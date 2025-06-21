@@ -22,8 +22,8 @@ def format_message(text):
     text = html.unescape(text)
     text = re.sub(r'\s+', ' ', text)
 
-    # Safe unicode emoji escape using raw strings or unicode literals
-    text = re.sub(r'(?m)^## (.+)$', r'*\U0001F4CC \1*', text)
+    # Use literal emoji instead of \U unicode escape
+    text = re.sub(r'(?m)^## (.+)$', r'*📌 \1*', text)
     text = re.sub(r'(?m)\*\*(.+?)\*\*', r'*\1*', text)
     text = re.sub(r'(?m)^[-*] ', '• ', text)
     text = re.sub(r'(?m)^(\d+\.)', r'\n\1', text)
