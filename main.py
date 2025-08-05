@@ -63,13 +63,14 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
 
     if last_conversation and last_conversation.response_id:
         api_params["previous_response_id"] = last_conversation.response_id
-
-    response = client.responses.create(**api_params)
-
-    logger.info(f"Response: {response}")
-    chatgpt_response = response.output_text
+    
+    whatsapp_response = "Sorry, We're having trouble processing your request right now."
 
     try:
+        response = client.responses.create(**api_params)
+        logger.info(f"Response: {response}")
+        chatgpt_response = response.output_text
+
         conversation = Conversation(
             sender=whatsapp_number,
             message=Body,
@@ -78,9 +79,13 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
         )
         db.add(conversation)
         db.commit()
+        whatsapp_response = chatgpt_response
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Failed to save conversation to database: {str(e)}")
-
-    send_whatsapp_message(whatsapp_number, chatgpt_response)
-    return {"message": chatgpt_response}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to create response: {str(e)}")
+    
+    send_whatsapp_message(whatsapp_number, whatsapp_response)
+    return {"message": whatsapp_response}
