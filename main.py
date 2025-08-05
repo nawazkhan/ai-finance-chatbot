@@ -29,7 +29,9 @@ def is_stock_request(message):
         'market cap', 'dividend', 'pe ratio', 'eps', 'ticker', 
         'nasdaq', 'nyse', 'dow', 'sp500'
     ]
-    return any(keyword in message.lower() for keyword in stock_keywords)
+    is_stock_request_result = any(keyword in message.lower() for keyword in stock_keywords)
+    logger.info(f"is_stock_request_result: {is_stock_request_result}")
+    return is_stock_request_result
 
 @app.post("/message")
 async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_db)):
@@ -54,6 +56,10 @@ async def reply(request: Request, Body: str = Form(), db: Session = Depends(get_
 
     if is_stock_request(Body):
         api_params["tools"] = [{"type": "web_search_preview"}]
+    else:
+        error_message = "I'm sorry, I can only help with stock requests right now."
+        send_whatsapp_message(whatsapp_number, error_message)
+        return {"message": error_message}
 
     if last_conversation and last_conversation.response_id:
         api_params["previous_response_id"] = last_conversation.response_id
